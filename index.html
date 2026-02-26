@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard DIOTT</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Agencia DIOTT</h1>
+            <div class="date-filter">
+                <div class="date-group">
+                    <label for="startDate">Desde:</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="date-group">
+                    <label for="endDate">Hasta:</label>
+                    <input type="date" id="endDate">
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <div class="client-card" id="client-1">
+                <h2>Cargando Cliente 1...</h2>
+                <div class="metrics">
+                    <div class="metric">
+                        <span>Gasto</span>
+                        <strong class="spend">$0.00</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Costo x Mensaje</span>
+                        <strong class="cpa">$0.00</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Mensajes</span>
+                        <strong class="results">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="client-card" id="client-2">
+                <h2>Cargando Cliente 2...</h2>
+                <div class="metrics">
+                    <div class="metric">
+                        <span>Gasto</span>
+                        <strong class="spend">$0.00</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Costo x Mensaje</span>
+                        <strong class="cpa">$0.00</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Mensajes</span>
+                        <strong class="results">0</strong>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
