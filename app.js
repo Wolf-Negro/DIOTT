@@ -28,10 +28,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-login').addEventListener('click', iniciarSesionFB);
     document.getElementById('btn-generate-dashboard').addEventListener('click', generarDashboard);
+    
+    // Botón para volver a editar cuentas
+    document.getElementById('btn-edit-setup').addEventListener('click', () => {
+        document.getElementById('dashboardGrid').classList.add('hidden');
+        document.getElementById('btn-edit-setup').classList.add('hidden');
+        document.getElementById('setupContainer').classList.remove('hidden');
+        document.getElementById('alertPanel').classList.add('hidden');
+    });
 
     const recargarSiEstaActivo = () => {
         if(startDateInput.value > endDateInput.value) return alert("Fecha inválida.");
-        if(ACCESS_TOKEN !== '' && CLIENTES.length > 0) cargarMetricas();
+        if(ACCESS_TOKEN !== '' && CLIENTES.length > 0 && !document.getElementById('dashboardGrid').classList.contains('hidden')) {
+            cargarMetricas();
+        }
     };
 
     startDateInput.addEventListener('change', recargarSiEstaActivo);
@@ -62,7 +72,7 @@ async function obtenerCuentas() {
                 const nombreSeguro = cuenta.name ? cuenta.name.replace(/"/g, '&quot;') : `Cuenta ${cuenta.account_id}`;
                 listDOM.innerHTML += `
                     <div class="account-item">
-                        <input type="checkbox" id="chk-${cuenta.account_id}" checked>
+                        <input type="checkbox" id="chk-${cuenta.account_id}">
                         <input type="text" id="name-${cuenta.account_id}" value="${nombreSeguro}" placeholder="Renombra este cliente">
                     </div>`;
             });
@@ -96,6 +106,7 @@ function generarDashboard() {
 
     document.getElementById('setupContainer').classList.add('hidden');
     document.getElementById('dashboardGrid').classList.remove('hidden');
+    document.getElementById('btn-edit-setup').classList.remove('hidden'); // Mostrar botón de editar
     
     dibujarTarjetas();
     cargarMetricas();
@@ -120,11 +131,35 @@ function dibujarTarjetas() {
                 </div>
                 <div class="metrics">
                     <div class="metric"><span>Gasto</span><strong class="spend">S/ 0.00</strong></div>
-                    <div class="metric"><span>CPA</span><strong class="cpa">S/ 0.00</strong></div>
-                    <div class="metric"><span>Mensajes</span><strong class="results">0</strong></div>
+                    <div class="metric"><span>Costo x <span class="lbl-tipo">Result.</span></span><strong class="cpa">S/ 0.00</strong></div>
+                    <div class="metric"><span class="lbl-resultado">Resultados</span><strong class="results">0</strong></div>
                 </div>
             </div>`;
     });
+}
+
+// INTELIGENCIA PARA DETECTAR EL OBJETIVO REAL DE LA CAMPAÑA
+function extraerResultadoPrincipal(actions) {
+    if (!actions) return { tipo: 'Resultados', valor: 0 };
+    
+    // Jerarquía de valor: 1. Compras, 2. Leads, 3. Mensajes, 4. Clics
+    const prioridades = [
+        { keys: ['purchase'], nombre: 'Compras', nombreCorto: 'Compra' },
+        { keys: ['lead'], nombre: 'Leads', nombreCorto: 'Lead' },
+        { keys: ['onsite_conversion.messaging_conversation_started_7d', 'messaging_conversation_started_7d', 'messages', 'onsite_conversion.messaging_first_reply'], nombre: 'Mensajes', nombreCorto: 'Msj' },
+        { keys: ['link_click'], nombre: 'Clics', nombreCorto: 'Clic' }
+    ];
+
+    for (let p of prioridades) {
+        let total = 0;
+        for (let a of actions) {
+            if (p.keys.some(k => a.action_type.includes(k))) {
+                total += parseFloat(a.value);
+            }
+        }
+        if (total > 0) return { tipo: p.nombre, tipoCorto: p.nombreCorto, valor: total };
+    }
+    return { tipo: 'Resultados', tipoCorto: 'Result.', valor: 0 };
 }
 
 async function cargarMetricas() {
@@ -151,20 +186,20 @@ async function cargarMetricas() {
                 const m = data.data[0];
                 const gasto = parseFloat(m.spend || 0);
                 
-                let msj = 0;
-                if (m.actions) {
-                    const accion = m.actions.find(a => a.action_type.includes('message'));
-                    if (accion) msj = parseFloat(accion.value);
-                }
-                
-                const cpa = msj > 0 ? (gasto/msj) : 0;
+                // Aplicar la inteligencia artificial de detección
+                const analisis = extraerResultadoPrincipal(m.actions);
+                const resultados = analisis.valor;
+                const cpa = resultados > 0 ? (gasto/resultados) : 0;
 
                 if (cpa > c.targetCPA) {
-                    alertasGlobales.push(`CPA Alto en ${c.name}: S/ ${cpa.toFixed(2)}.`);
+                    alertasGlobales.push(`Costo Alto: ${c.name} está pagando S/ ${cpa.toFixed(2)} por ${analisis.tipoCorto}.`);
                 }
 
+                card.querySelector('.lbl-resultado').textContent = analisis.tipo;
+                card.querySelector('.lbl-tipo').textContent = analisis.tipoCorto;
+                
                 card.querySelector('.spend').textContent = `S/ ${gasto.toFixed(2)}`;
-                card.querySelector('.results').textContent = msj;
+                card.querySelector('.results').textContent = resultados;
                 card.querySelector('.cpa').textContent = `S/ ${cpa.toFixed(2)}`;
             } else {
                 card.querySelector('.spend').textContent = 'S/ 0.00';

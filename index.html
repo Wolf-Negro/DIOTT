@@ -4,12 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SaaS Dashboard | IGNITE</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Agencia SaaS <span class="beta-tag">BETA</span></h1>
+            <div class="header-title">
+                <h1>Agencia SaaS <span class="beta-tag">BETA</span></h1>
+                <button id="btn-edit-setup" class="btn-edit hidden">⚙️ Editar Cuentas</button>
+            </div>
             <div class="date-filter">
                 <div class="date-group">
                     <label for="startDate">Desde:</label>
@@ -57,6 +60,6 @@
 
         <main class="dashboard-grid hidden" id="dashboardGrid"></main>
     </div>
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

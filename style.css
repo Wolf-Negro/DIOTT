@@ -13,9 +13,12 @@ header {
     flex-wrap: wrap; gap: 15px;
 }
 
+.header-title { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
 h1 { font-size: 1.8rem; font-weight: 700; background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.beta-tag { font-size: 0.6rem; background: #3b82f6; color: white; padding: 3px 8px; border-radius: 12px; vertical-align: middle; text-transform: uppercase; }
 
-.beta-tag { font-size: 0.6rem; background: #3b82f6; color: white; padding: 3px 8px; border-radius: 12px; vertical-align: middle; margin-left: 10px; text-transform: uppercase; }
+.btn-edit { background: #334155; color: #f1f5f9; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s; }
+.btn-edit:hover { background: #475569; }
 
 .date-filter, .date-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .date-group label { font-weight: 600; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
@@ -24,9 +27,7 @@ h1 { font-size: 1.8rem; font-weight: 700; background: linear-gradient(90deg, #38
 .hidden { display: none !important; }
 
 /* --- SECCIÓN LOGIN Y SETUP --- */
-.login-container, .setup-container {
-    background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 40px 20px; text-align: center; margin-bottom: 30px;
-}
+.login-container, .setup-container { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 40px 20px; text-align: center; margin-bottom: 30px; }
 .setup-container { text-align: left; }
 .setup-container h2 { color: #f1f5f9; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; }
 .setup-group { margin-bottom: 25px; }
