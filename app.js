@@ -1,7 +1,7 @@
 // ================= CONFIGURACIÓN =================
 const APP_ID = '1616612773095470'; // Facebook
 const SUPABASE_URL = 'https://nqjaynrdjejwnkfogpqu.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_4gT8wKDrm1t-MrIkUxbLRw_mAfGAqot'; // <--- PEGA AQUÍ TU PUBLISHABLE KEY COMPLETA
+const SUPABASE_KEY = 'sb_publishable_4gT8wKDrm1t-MrIkUxbLRw_mAfGAqot';
 
 let ACCESS_TOKEN = '';
 let FB_USER_ID = ''; 
@@ -70,41 +70,55 @@ document.addEventListener('DOMContentLoaded', () => {
 // ================= LÓGICA DE NUBE & LOGIN =================
 function iniciarSesionFB() {
     const btnLogin = document.getElementById('btn-login');
-    btnLogin.innerHTML = "Conectando con la nube... ☁️";
+    btnLogin.innerHTML = "Conectando con FB... ⏳";
+    console.log("1. Solicitando acceso a Facebook...");
 
-    FB.login(async function(response) {
+    // Quitamos el 'async' de aquí para que FB no colapse
+    FB.login(function(response) {
+        console.log("2. Respuesta de FB:", response);
         if (response.authResponse) {
+            btnLogin.innerHTML = "Revisando la nube... ☁️";
             ACCESS_TOKEN = response.authResponse.accessToken;
             FB_USER_ID = response.authResponse.userID;
             
-            document.getElementById('loginContainer').classList.add('hidden');
-            
-            // INTELIGENCIA DE NUBE: Buscar configuración en Supabase
-            const datosNube = await cargarDeSupabase();
-            
-            if (datosNube) {
-                // Si existe en la nube, saltamos al Dashboard
-                CLIENTES = datosNube.config_clientes;
-                
-                if(datosNube.agency_name) {
-                    document.getElementById('agencyNameInput').value = datosNube.agency_name;
-                    document.querySelector('header h1').innerHTML = `${datosNube.agency_name} <span class="beta-tag">SaaS BETA</span>`;
-                }
-
-                document.getElementById('dashboardGrid').classList.remove('hidden');
-                document.getElementById('btn-edit-setup').classList.remove('hidden');
-                
-                dibujarTarjetas();
-                cargarMetricas();
-            } else {
-                // Si es su primera vez, mostramos el Panel de Configuración
-                document.getElementById('setupContainer').classList.remove('hidden');
-                obtenerCuentas();
-            }
+            // Llamamos a la función asíncrona de forma segura
+            procesarConexionNube();
         } else {
-            btnLogin.innerHTML = "Continuar con Facebook"; // Si cancela
+            btnLogin.innerHTML = "Continuar con Facebook"; 
+            console.log("El usuario canceló o el navegador bloqueó el popup.");
         }
     }, {scope: 'ads_read'});
+}
+
+async function procesarConexionNube() {
+    try {
+        console.log("3. Buscando en Supabase para el usuario:", FB_USER_ID);
+        document.getElementById('loginContainer').classList.add('hidden');
+        
+        const datosNube = await cargarDeSupabase();
+        
+        if (datosNube) {
+            console.log("4. ¡Datos encontrados en la nube!", datosNube);
+            CLIENTES = datosNube.config_clientes;
+            
+            if(datosNube.agency_name) {
+                document.getElementById('agencyNameInput').value = datosNube.agency_name;
+                document.querySelector('header h1').innerHTML = `${datosNube.agency_name} <span class="beta-tag">SaaS BETA</span>`;
+            }
+
+            document.getElementById('dashboardGrid').classList.remove('hidden');
+            document.getElementById('btn-edit-setup').classList.remove('hidden');
+            
+            dibujarTarjetas();
+            cargarMetricas();
+        } else {
+            console.log("4. Usuario nuevo, mostrando panel de configuración.");
+            document.getElementById('setupContainer').classList.remove('hidden');
+            obtenerCuentas();
+        }
+    } catch (error) {
+        console.error("Error crítico en la conexión con la nube:", error);
+    }
 }
 
 // LECTURA DE SUPABASE
@@ -112,14 +126,16 @@ async function cargarDeSupabase() {
     const url = `${SUPABASE_URL}/rest/v1/agencias?fb_user_id=eq.${FB_USER_ID}&select=*`;
     try {
         const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
-        if (data && data.length > 0) return data[0]; // Retorna el registro de la agencia
-    } catch(e) { console.error("Error conectando a Supabase:", e); }
+        if (data && data.length > 0) return data[0]; 
+    } catch(e) { console.error("Fallo al leer de Supabase:", e); }
     return null;
 }
 
 // ESCRITURA EN SUPABASE
 async function guardarEnSupabase(agencyName, configClientes) {
+    console.log("Guardando configuración en la nube...");
     const url = `${SUPABASE_URL}/rest/v1/agencias?fb_user_id=eq.${FB_USER_ID}`;
     const payload = {
         fb_user_id: FB_USER_ID,
@@ -132,21 +148,23 @@ async function guardarEnSupabase(agencyName, configClientes) {
         const data = await res.json();
 
         if (data && data.length > 0) {
-            // Actualizar (PATCH)
+            // Actualizar
             await fetch(url, {
                 method: 'PATCH',
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            console.log("¡Nube actualizada con éxito!");
         } else {
-            // Insertar nuevo (POST)
+            // Insertar nuevo
             await fetch(`${SUPABASE_URL}/rest/v1/agencias`, {
                 method: 'POST',
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            console.log("¡Primera configuración guardada en la nube con éxito!");
         }
-    } catch(e) { console.error("Error guardando en Supabase:", e); }
+    } catch(e) { console.error("Fallo al guardar en Supabase:", e); }
 }
 
 // ================= FLUJO B2B =================
