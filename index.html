@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard DIOTT</title>
+    <title>SaaS Dashboard | IGNITE</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Agencia DIOTT</h1>
+            <h1>Agencia SaaS <span class="beta-tag">BETA</span></h1>
             <div class="date-filter">
                 <div class="date-group">
                     <label for="startDate">Desde:</label>
@@ -22,43 +22,21 @@
             </div>
         </header>
 
-        <main class="dashboard-grid">
-            <div class="client-card" id="client-1">
-                <h2>Cargando Cliente 1...</h2>
-                <div class="metrics">
-                    <div class="metric">
-                        <span>Gasto</span>
-                        <strong class="spend">$0.00</strong>
-                    </div>
-                    <div class="metric">
-                        <span>Costo x Mensaje</span>
-                        <strong class="cpa">$0.00</strong>
-                    </div>
-                    <div class="metric">
-                        <span>Mensajes</span>
-                        <strong class="results">0</strong>
-                    </div>
-                </div>
-            </div>
+        <div id="loginContainer" class="login-container">
+            <h2>Conecta tu agencia</h2>
+            <p>Inicia sesión para cargar automáticamente las cuentas de tus clientes.</p>
+            <button id="btn-login" class="btn-fb">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M12 2.04c-5.5 0-10 4.48-10 10.02 0 5 3.66 9.15 8.44 9.9v-7H7.9v-2.9h2.54V9.85c0-2.51 1.49-3.89 3.78-3.89 1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.45 2.9h-2.33v7a10 10 0 0 0 8.44-9.9c0-5.54-4.5-10.02-10-10.02Z"/></svg>
+                Continuar con Facebook
+            </button>
+        </div>
 
-            <div class="client-card" id="client-2">
-                <h2>Cargando Cliente 2...</h2>
-                <div class="metrics">
-                    <div class="metric">
-                        <span>Gasto</span>
-                        <strong class="spend">$0.00</strong>
-                    </div>
-                    <div class="metric">
-                        <span>Costo x Mensaje</span>
-                        <strong class="cpa">$0.00</strong>
-                    </div>
-                    <div class="metric">
-                        <span>Mensajes</span>
-                        <strong class="results">0</strong>
-                    </div>
-                </div>
-            </div>
-        </main>
+        <div id="alertPanel" class="alert-panel hidden">
+            <h3>⚠️ Alertas Tempranas</h3>
+            <ul id="alertList"></ul>
+        </div>
+
+        <main class="dashboard-grid" id="dashboardGrid" style="display: none;"></main>
     </div>
     <script src="app.js"></script>
 </body>
