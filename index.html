@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SaaS Dashboard | IGNITE</title>
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
     <div class="container">
@@ -44,7 +44,10 @@
 
             <div class="setup-group">
                 <label>Selecciona y renombra tus clientes:</label>
-                <p class="subtitle">Marca las cuentas que quieres ver y ponles el nombre comercial.</p>
+                <p class="subtitle">Busca, marca las cuentas que quieres ver y ponles su nombre comercial.</p>
+                
+                <input type="text" id="searchAccountInput" class="search-input" placeholder="🔍 Buscar cuenta publicitaria...">
+                
                 <div id="accountsList" class="accounts-list">
                     <p>Cargando cuentas de Meta...</p>
                 </div>
@@ -60,6 +63,6 @@
 
         <main class="dashboard-grid hidden" id="dashboardGrid"></main>
     </div>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>

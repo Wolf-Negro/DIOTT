@@ -29,12 +29,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-login').addEventListener('click', iniciarSesionFB);
     document.getElementById('btn-generate-dashboard').addEventListener('click', generarDashboard);
     
-    // Botón para volver a editar cuentas
     document.getElementById('btn-edit-setup').addEventListener('click', () => {
         document.getElementById('dashboardGrid').classList.add('hidden');
         document.getElementById('btn-edit-setup').classList.add('hidden');
         document.getElementById('setupContainer').classList.remove('hidden');
         document.getElementById('alertPanel').classList.add('hidden');
+    });
+
+    // LÓGICA DEL BUSCADOR DE CUENTAS
+    document.getElementById('searchAccountInput').addEventListener('input', function(e) {
+        const text = e.target.value.toLowerCase();
+        const items = document.querySelectorAll('.account-item');
+        items.forEach(item => {
+            const nameInput = item.querySelector('input[type="text"]');
+            if (nameInput && nameInput.value.toLowerCase().includes(text)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
     });
 
     const recargarSiEstaActivo = () => {
@@ -60,7 +73,7 @@ function iniciarSesionFB() {
 }
 
 async function obtenerCuentas() {
-    const url = `https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id,account_status&limit=50&access_token=${ACCESS_TOKEN}`;
+    const url = `https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id,account_status&limit=100&access_token=${ACCESS_TOKEN}`;
     const listDOM = document.getElementById('accountsList');
     try {
         const res = await fetch(url);
@@ -73,7 +86,7 @@ async function obtenerCuentas() {
                 listDOM.innerHTML += `
                     <div class="account-item">
                         <input type="checkbox" id="chk-${cuenta.account_id}">
-                        <input type="text" id="name-${cuenta.account_id}" value="${nombreSeguro}" placeholder="Renombra este cliente">
+                        <input type="text" id="name-${cuenta.account_id}" value="${nombreSeguro}">
                     </div>`;
             });
         } else {
@@ -106,7 +119,7 @@ function generarDashboard() {
 
     document.getElementById('setupContainer').classList.add('hidden');
     document.getElementById('dashboardGrid').classList.remove('hidden');
-    document.getElementById('btn-edit-setup').classList.remove('hidden'); // Mostrar botón de editar
+    document.getElementById('btn-edit-setup').classList.remove('hidden');
     
     dibujarTarjetas();
     cargarMetricas();
@@ -138,27 +151,40 @@ function dibujarTarjetas() {
     });
 }
 
-// INTELIGENCIA PARA DETECTAR EL OBJETIVO REAL DE LA CAMPAÑA
+// NUEVA INTELIGENCIA: EXTRACCIÓN EXACTA, SIN SUMAS DOBLES
 function extraerResultadoPrincipal(actions) {
-    if (!actions) return { tipo: 'Resultados', valor: 0 };
+    if (!actions) return { tipo: 'Resultados', tipoCorto: 'Result.', valor: 0 };
     
-    // Jerarquía de valor: 1. Compras, 2. Leads, 3. Mensajes, 4. Clics
-    const prioridades = [
-        { keys: ['purchase'], nombre: 'Compras', nombreCorto: 'Compra' },
-        { keys: ['lead'], nombre: 'Leads', nombreCorto: 'Lead' },
-        { keys: ['onsite_conversion.messaging_conversation_started_7d', 'messaging_conversation_started_7d', 'messages', 'onsite_conversion.messaging_first_reply'], nombre: 'Mensajes', nombreCorto: 'Msj' },
-        { keys: ['link_click'], nombre: 'Clics', nombreCorto: 'Clic' }
-    ];
+    // Función para sacar el valor de una métrica sin sumar repetidos
+    const getVal = (type) => {
+        const act = actions.find(a => a.action_type === type);
+        return act ? parseFloat(act.value) : 0;
+    };
 
-    for (let p of prioridades) {
-        let total = 0;
-        for (let a of actions) {
-            if (p.keys.some(k => a.action_type.includes(k))) {
-                total += parseFloat(a.value);
-            }
-        }
-        if (total > 0) return { tipo: p.nombre, tipoCorto: p.nombreCorto, valor: total };
+    // 1. Prioridad: Compras
+    let compras = getVal('purchase') || getVal('offsite_conversion.fb_pixel_purchase');
+    if (compras > 0) return { tipo: 'Compras', tipoCorto: 'Compra', valor: compras };
+
+    // 2. Prioridad: Leads
+    let leads = getVal('lead') || getVal('offsite_conversion.fb_pixel_lead');
+    if (leads > 0) return { tipo: 'Leads', tipoCorto: 'Lead', valor: leads };
+
+    // 3. Prioridad: Mensajes (Se toma el principal, NO se suman para evitar inflación)
+    let mensajes = getVal('onsite_conversion.messaging_first_reply') 
+                || getVal('onsite_conversion.messaging_conversation_started_7d')
+                || getVal('messaging_conversation_started_7d');
+                
+    if (mensajes === 0) {
+        const fallbackMsj = actions.find(a => a.action_type.includes('message'));
+        if (fallbackMsj) mensajes = parseFloat(fallbackMsj.value);
     }
+    
+    if (mensajes > 0) return { tipo: 'Mensajes', tipoCorto: 'Msj', valor: mensajes };
+
+    // 4. Fallback: Clics en el enlace
+    let clics = getVal('link_click');
+    if (clics > 0) return { tipo: 'Clics', tipoCorto: 'Clic', valor: clics };
+
     return { tipo: 'Resultados', tipoCorto: 'Result.', valor: 0 };
 }
 
@@ -186,10 +212,9 @@ async function cargarMetricas() {
                 const m = data.data[0];
                 const gasto = parseFloat(m.spend || 0);
                 
-                // Aplicar la inteligencia artificial de detección
                 const analisis = extraerResultadoPrincipal(m.actions);
                 const resultados = analisis.valor;
-                const cpa = resultados > 0 ? (gasto/resultados) : 0;
+                const cpa = resultados > 0 ? (gasto / resultados) : 0;
 
                 if (cpa > c.targetCPA) {
                     alertasGlobales.push(`Costo Alto: ${c.name} está pagando S/ ${cpa.toFixed(2)} por ${analisis.tipoCorto}.`);
