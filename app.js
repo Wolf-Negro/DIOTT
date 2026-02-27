@@ -2,6 +2,8 @@ const APP_ID = '1616612773095470';
 let ACCESS_TOKEN = '';
 let CLIENTES = [];
 let cuentasBaseMeta = [];
+let alertasGlobales = [];
+const DEFAULT_TARGET_CPA = 5.00;
 
 window.fbAsyncInit = function() {
     FB.init({ appId: APP_ID, cookie: true, xfbml: true, version: 'v19.0' });
@@ -16,8 +18,24 @@ window.fbAsyncInit = function() {
 }(document, 'script', 'facebook-jssdk'));
 
 document.addEventListener('DOMContentLoaded', () => {
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0];
+    startDateInput.value = formattedDate;
+    endDateInput.value = formattedDate;
+
     document.getElementById('btn-login').addEventListener('click', iniciarSesionFB);
     document.getElementById('btn-generate-dashboard').addEventListener('click', generarDashboard);
+
+    const recargarSiEstaActivo = () => {
+        if(startDateInput.value > endDateInput.value) return alert("Fecha inválida.");
+        if(ACCESS_TOKEN !== '' && CLIENTES.length > 0) cargarMetricas();
+    };
+
+    startDateInput.addEventListener('change', recargarSiEstaActivo);
+    endDateInput.addEventListener('change', recargarSiEstaActivo);
 });
 
 function iniciarSesionFB() {
@@ -37,35 +55,44 @@ async function obtenerCuentas() {
     try {
         const res = await fetch(url);
         const data = await res.json();
-        if (data.data) {
+        if (data.data && data.data.length > 0) {
             cuentasBaseMeta = data.data;
             listDOM.innerHTML = '';
             cuentasBaseMeta.forEach(cuenta => {
+                const nombreSeguro = cuenta.name ? cuenta.name.replace(/"/g, '&quot;') : `Cuenta ${cuenta.account_id}`;
                 listDOM.innerHTML += `
                     <div class="account-item">
                         <input type="checkbox" id="chk-${cuenta.account_id}" checked>
-                        <input type="text" id="name-${cuenta.account_id}" value="${cuenta.name}">
+                        <input type="text" id="name-${cuenta.account_id}" value="${nombreSeguro}" placeholder="Renombra este cliente">
                     </div>`;
             });
+        } else {
+            listDOM.innerHTML = '<p>No se encontraron cuentas publicitarias.</p>';
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { listDOM.innerHTML = '<p>Error de conexión con Meta.</p>'; }
 }
 
 function generarDashboard() {
     const agencyName = document.getElementById('agencyNameInput').value;
-    if(agencyName) document.querySelector('header h1').textContent = agencyName;
+    if(agencyName.trim() !== '') {
+        document.querySelector('header h1').innerHTML = `${agencyName} <span class="beta-tag">SaaS BETA</span>`;
+    }
 
     CLIENTES = [];
     cuentasBaseMeta.forEach(cuenta => {
-        if(document.getElementById(`chk-${cuenta.account_id}`).checked) {
+        const check = document.getElementById(`chk-${cuenta.account_id}`);
+        if(check && check.checked) {
             CLIENTES.push({
                 idDOM: `client-${cuenta.account_id}`,
                 accountId: cuenta.id,
                 name: document.getElementById(`name-${cuenta.account_id}`).value,
-                status: cuenta.account_status
+                status: cuenta.account_status,
+                targetCPA: DEFAULT_TARGET_CPA
             });
         }
     });
+
+    if(CLIENTES.length === 0) return alert("Debes seleccionar al menos una cuenta.");
 
     document.getElementById('setupContainer').classList.add('hidden');
     document.getElementById('dashboardGrid').classList.remove('hidden');
@@ -78,11 +105,18 @@ function dibujarTarjetas() {
     const grid = document.getElementById('dashboardGrid');
     grid.innerHTML = '';
     CLIENTES.forEach(c => {
+        let badgeClass = 'status-warning';
+        let badgeText = 'REVISIÓN/OTRO';
+        
+        if(c.status === 1) { badgeClass = 'status-active'; badgeText = 'ACTIVA'; }
+        else if(c.status === 2) { badgeClass = 'status-error'; badgeText = 'INHABILITADA'; }
+        else if(c.status === 3) { badgeClass = 'status-warning'; badgeText = 'ERROR PAGO'; }
+
         grid.innerHTML += `
             <div class="client-card" id="${c.idDOM}">
                 <div class="card-header">
                     <h2>${c.name}</h2>
-                    <span class="status-badge ${c.status === 1 ? 'status-active' : 'status-error'}">${c.status === 1 ? 'ACTIVA' : 'REVISIÓN'}</span>
+                    <span class="status-badge ${badgeClass}">${badgeText}</span>
                 </div>
                 <div class="metrics">
                     <div class="metric"><span>Gasto</span><strong class="spend">S/ 0.00</strong></div>
@@ -97,21 +131,57 @@ async function cargarMetricas() {
     const start = document.getElementById('startDate').value;
     const end = document.getElementById('endDate').value;
     const range = JSON.stringify({ since: start, until: end });
+    
+    alertasGlobales = [];
+    document.getElementById('alertPanel').classList.add('hidden');
+    document.getElementById('alertList').innerHTML = '';
 
     for (const c of CLIENTES) {
         const url = `https://graph.facebook.com/v19.0/${c.accountId}/insights?fields=spend,actions&time_range=${range}&access_token=${ACCESS_TOKEN}`;
+        const card = document.getElementById(c.idDOM);
+        
+        card.querySelector('.spend').textContent = '...';
+        card.querySelector('.cpa').textContent = '...';
+        card.querySelector('.results').textContent = '...';
+
         try {
             const res = await fetch(url);
             const data = await res.json();
             if (data.data && data.data.length > 0) {
                 const m = data.data[0];
-                const gasto = parseFloat(m.spend);
-                const msj = m.actions ? (m.actions.find(a => a.action_type.includes('message'))?.value || 0) : 0;
-                const card = document.getElementById(c.idDOM);
+                const gasto = parseFloat(m.spend || 0);
+                
+                let msj = 0;
+                if (m.actions) {
+                    const accion = m.actions.find(a => a.action_type.includes('message'));
+                    if (accion) msj = parseFloat(accion.value);
+                }
+                
+                const cpa = msj > 0 ? (gasto/msj) : 0;
+
+                if (cpa > c.targetCPA) {
+                    alertasGlobales.push(`CPA Alto en ${c.name}: S/ ${cpa.toFixed(2)}.`);
+                }
+
                 card.querySelector('.spend').textContent = `S/ ${gasto.toFixed(2)}`;
                 card.querySelector('.results').textContent = msj;
-                card.querySelector('.cpa').textContent = `S/ ${msj > 0 ? (gasto/msj).toFixed(2) : '0.00'}`;
+                card.querySelector('.cpa').textContent = `S/ ${cpa.toFixed(2)}`;
+            } else {
+                card.querySelector('.spend').textContent = 'S/ 0.00';
+                card.querySelector('.results').textContent = '0';
+                card.querySelector('.cpa').textContent = 'S/ 0.00';
             }
         } catch (e) { console.error(e); }
+    }
+
+    if (alertasGlobales.length > 0) {
+        const panel = document.getElementById('alertPanel');
+        const list = document.getElementById('alertList');
+        panel.classList.remove('hidden');
+        alertasGlobales.forEach(alerta => {
+            const li = document.createElement('li');
+            li.textContent = alerta;
+            list.appendChild(li);
+        });
     }
 }

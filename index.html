@@ -1,4 +1,28 @@
-<div id="loginContainer" class="login-container">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Dashboard | IGNITE</title>
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Agencia SaaS <span class="beta-tag">BETA</span></h1>
+            <div class="date-filter">
+                <div class="date-group">
+                    <label for="startDate">Desde:</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="date-group">
+                    <label for="endDate">Hasta:</label>
+                    <input type="date" id="endDate">
+                </div>
+            </div>
+        </header>
+
+        <div id="loginContainer" class="login-container">
             <h2>Conecta tu agencia</h2>
             <p>Inicia sesión para cargar automáticamente las cuentas de tus clientes.</p>
             <button id="btn-login" class="btn-fb">
@@ -32,3 +56,7 @@
         </div>
 
         <main class="dashboard-grid hidden" id="dashboardGrid"></main>
+    </div>
+    <script src="app.js?v=2"></script>
+</body>
+</html>
