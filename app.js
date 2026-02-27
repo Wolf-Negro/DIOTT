@@ -1,10 +1,16 @@
-const APP_ID = '1616612773095470';
+// ================= CONFIGURACIÓN =================
+const APP_ID = '1616612773095470'; // Facebook
+const SUPABASE_URL = 'https://nqjaynrdjejwnkfogpqu.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_4gT8wKDrm1t-MrIkUxbLRw_mAfGAqot'; // <--- PEGA AQUÍ TU PUBLISHABLE KEY COMPLETA
+
 let ACCESS_TOKEN = '';
+let FB_USER_ID = ''; 
 let CLIENTES = [];
 let cuentasBaseMeta = [];
 let alertasGlobales = [];
 const DEFAULT_TARGET_CPA = 5.00;
 
+// Inicializar Facebook SDK
 window.fbAsyncInit = function() {
     FB.init({ appId: APP_ID, cookie: true, xfbml: true, version: 'v19.0' });
 };
@@ -34,9 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-edit-setup').classList.add('hidden');
         document.getElementById('setupContainer').classList.remove('hidden');
         document.getElementById('alertPanel').classList.add('hidden');
+        obtenerCuentas(); 
     });
 
-    // LÓGICA DEL BUSCADOR DE CUENTAS
     document.getElementById('searchAccountInput').addEventListener('input', function(e) {
         const text = e.target.value.toLowerCase();
         const items = document.querySelectorAll('.account-item');
@@ -61,17 +67,89 @@ document.addEventListener('DOMContentLoaded', () => {
     endDateInput.addEventListener('change', recargarSiEstaActivo);
 });
 
+// ================= LÓGICA DE NUBE & LOGIN =================
 function iniciarSesionFB() {
-    FB.login(function(response) {
+    const btnLogin = document.getElementById('btn-login');
+    btnLogin.innerHTML = "Conectando con la nube... ☁️";
+
+    FB.login(async function(response) {
         if (response.authResponse) {
             ACCESS_TOKEN = response.authResponse.accessToken;
+            FB_USER_ID = response.authResponse.userID;
+            
             document.getElementById('loginContainer').classList.add('hidden');
-            document.getElementById('setupContainer').classList.remove('hidden');
-            obtenerCuentas();
+            
+            // INTELIGENCIA DE NUBE: Buscar configuración en Supabase
+            const datosNube = await cargarDeSupabase();
+            
+            if (datosNube) {
+                // Si existe en la nube, saltamos al Dashboard
+                CLIENTES = datosNube.config_clientes;
+                
+                if(datosNube.agency_name) {
+                    document.getElementById('agencyNameInput').value = datosNube.agency_name;
+                    document.querySelector('header h1').innerHTML = `${datosNube.agency_name} <span class="beta-tag">SaaS BETA</span>`;
+                }
+
+                document.getElementById('dashboardGrid').classList.remove('hidden');
+                document.getElementById('btn-edit-setup').classList.remove('hidden');
+                
+                dibujarTarjetas();
+                cargarMetricas();
+            } else {
+                // Si es su primera vez, mostramos el Panel de Configuración
+                document.getElementById('setupContainer').classList.remove('hidden');
+                obtenerCuentas();
+            }
+        } else {
+            btnLogin.innerHTML = "Continuar con Facebook"; // Si cancela
         }
     }, {scope: 'ads_read'});
 }
 
+// LECTURA DE SUPABASE
+async function cargarDeSupabase() {
+    const url = `${SUPABASE_URL}/rest/v1/agencias?fb_user_id=eq.${FB_USER_ID}&select=*`;
+    try {
+        const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+        const data = await res.json();
+        if (data && data.length > 0) return data[0]; // Retorna el registro de la agencia
+    } catch(e) { console.error("Error conectando a Supabase:", e); }
+    return null;
+}
+
+// ESCRITURA EN SUPABASE
+async function guardarEnSupabase(agencyName, configClientes) {
+    const url = `${SUPABASE_URL}/rest/v1/agencias?fb_user_id=eq.${FB_USER_ID}`;
+    const payload = {
+        fb_user_id: FB_USER_ID,
+        agency_name: agencyName,
+        config_clientes: configClientes
+    };
+
+    try {
+        const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+            // Actualizar (PATCH)
+            await fetch(url, {
+                method: 'PATCH',
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } else {
+            // Insertar nuevo (POST)
+            await fetch(`${SUPABASE_URL}/rest/v1/agencias`, {
+                method: 'POST',
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+    } catch(e) { console.error("Error guardando en Supabase:", e); }
+}
+
+// ================= FLUJO B2B =================
 async function obtenerCuentas() {
     const url = `https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id,account_status&limit=100&access_token=${ACCESS_TOKEN}`;
     const listDOM = document.getElementById('accountsList');
@@ -81,12 +159,17 @@ async function obtenerCuentas() {
         if (data.data && data.data.length > 0) {
             cuentasBaseMeta = data.data;
             listDOM.innerHTML = '';
+            
             cuentasBaseMeta.forEach(cuenta => {
                 const nombreSeguro = cuenta.name ? cuenta.name.replace(/"/g, '&quot;') : `Cuenta ${cuenta.account_id}`;
+                const clienteGuardado = CLIENTES.find(c => c.accountId === cuenta.id);
+                const isChecked = clienteGuardado ? 'checked' : '';
+                const nombreMostrar = clienteGuardado ? clienteGuardado.name : nombreSeguro;
+
                 listDOM.innerHTML += `
                     <div class="account-item">
-                        <input type="checkbox" id="chk-${cuenta.account_id}">
-                        <input type="text" id="name-${cuenta.account_id}" value="${nombreSeguro}">
+                        <input type="checkbox" id="chk-${cuenta.account_id}" ${isChecked}>
+                        <input type="text" id="name-${cuenta.account_id}" value="${nombreMostrar}">
                     </div>`;
             });
         } else {
@@ -116,6 +199,9 @@ function generarDashboard() {
     });
 
     if(CLIENTES.length === 0) return alert("Debes seleccionar al menos una cuenta.");
+
+    // MÁGIA DE NUBE: Guardamos todo en Supabase en segundo plano
+    guardarEnSupabase(agencyName, CLIENTES);
 
     document.getElementById('setupContainer').classList.add('hidden');
     document.getElementById('dashboardGrid').classList.remove('hidden');
@@ -151,25 +237,20 @@ function dibujarTarjetas() {
     });
 }
 
-// NUEVA INTELIGENCIA: EXTRACCIÓN EXACTA, SIN SUMAS DOBLES
 function extraerResultadoPrincipal(actions) {
     if (!actions) return { tipo: 'Resultados', tipoCorto: 'Result.', valor: 0 };
     
-    // Función para sacar el valor de una métrica sin sumar repetidos
     const getVal = (type) => {
         const act = actions.find(a => a.action_type === type);
         return act ? parseFloat(act.value) : 0;
     };
 
-    // 1. Prioridad: Compras
     let compras = getVal('purchase') || getVal('offsite_conversion.fb_pixel_purchase');
     if (compras > 0) return { tipo: 'Compras', tipoCorto: 'Compra', valor: compras };
 
-    // 2. Prioridad: Leads
     let leads = getVal('lead') || getVal('offsite_conversion.fb_pixel_lead');
     if (leads > 0) return { tipo: 'Leads', tipoCorto: 'Lead', valor: leads };
 
-    // 3. Prioridad: Mensajes (Se toma el principal, NO se suman para evitar inflación)
     let mensajes = getVal('onsite_conversion.messaging_first_reply') 
                 || getVal('onsite_conversion.messaging_conversation_started_7d')
                 || getVal('messaging_conversation_started_7d');
@@ -181,7 +262,6 @@ function extraerResultadoPrincipal(actions) {
     
     if (mensajes > 0) return { tipo: 'Mensajes', tipoCorto: 'Msj', valor: mensajes };
 
-    // 4. Fallback: Clics en el enlace
     let clics = getVal('link_click');
     if (clics > 0) return { tipo: 'Clics', tipoCorto: 'Clic', valor: clics };
 
