@@ -1,11 +1,12 @@
 // ==========================================
 // CONFIGURACIÓN SAAS
 // ==========================================
-const APP_ID = '1616612773095470'; // Tu identificador real
+const APP_ID = '1616612773095470'; 
 let ACCESS_TOKEN = ''; 
-let CLIENTES = []; // Ahora la lista empieza vacía
+let CLIENTES = []; 
 let alertasGlobales = [];
 const DEFAULT_TARGET_CPA = 5.00; 
+let cuentasBaseMeta = [];
 
 // 1. Inicializar el SDK de Facebook
 window.fbAsyncInit = function() {
@@ -17,7 +18,6 @@ window.fbAsyncInit = function() {
     });
 };
 
-// Cargar el script de Meta de forma asíncrona
 (function(d, s, id){
     var js, fjs = d.getElementsByTagName(s)[0];
     if (d.getElementById(id)) {return;}
@@ -35,12 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
     startDateInput.value = formattedDate;
     endDateInput.value = formattedDate;
 
-    // Escuchar el botón de Login
     document.getElementById('btn-login').addEventListener('click', iniciarSesionFB);
 
     const actualizarFechas = () => {
         if(startDateInput.value > endDateInput.value) return alert("Fecha inválida.");
-        if(ACCESS_TOKEN !== '') cargarDatos(startDateInput.value, endDateInput.value);
+        // Solo recargar si ya pasamos el setup
+        if(ACCESS_TOKEN !== '' && CLIENTES.length > 0) {
+            cargarDatos(startDateInput.value, endDateInput.value);
+        }
     };
 
     startDateInput.addEventListener('change', actualizarFechas);
@@ -52,50 +54,84 @@ function iniciarSesionFB() {
     FB.login(function(response) {
         if (response.authResponse) {
             ACCESS_TOKEN = response.authResponse.accessToken;
-            document.getElementById('loginContainer').style.display = 'none';
-            document.getElementById('dashboardGrid').style.display = 'grid';
+            document.getElementById('loginContainer').classList.add('hidden');
+            document.getElementById('setupContainer').classList.remove('hidden');
             obtenerCuentasDeAgencia();
         } else {
-            alert('Cancelaste el inicio de sesión o no diste permisos.');
+            alert('Cancelaste el inicio de sesión.');
         }
-    }, {scope: 'ads_read'}); // Permiso obligatorio para leer anuncios
+    }, {scope: 'ads_read'}); 
 }
 
-// 3. Obtener dinámicamente las cuentas publicitarias
+// 3. Obtener cuentas y mostrarlas en el SETUP
 async function obtenerCuentasDeAgencia() {
     const url = `https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id,account_status&limit=50&access_token=${ACCESS_TOKEN}`;
+    const listDOM = document.getElementById('accountsList');
     
     try {
         const res = await fetch(url);
         const data = await res.json();
         
-        if (data.data) {
-            CLIENTES = data.data.map(cuenta => ({
-                idDOM: `client-${cuenta.account_id}`,
-                accountId: cuenta.id,
-                name: cuenta.name || `Cuenta ${cuenta.account_id}`,
-                status: cuenta.account_status,
-                targetCPA: DEFAULT_TARGET_CPA
-            }));
-            
-            construirTarjetasHTML();
-            
-            const start = document.getElementById('startDate').value;
-            const end = document.getElementById('endDate').value;
-            cargarDatos(start, end);
+        if (data.data && data.data.length > 0) {
+            cuentasBaseMeta = data.data;
+            listDOM.innerHTML = ''; 
+
+            cuentasBaseMeta.forEach(cuenta => {
+                const nombreOriginal = cuenta.name || `Cuenta ${cuenta.account_id}`;
+                listDOM.innerHTML += `
+                    <div class="account-item">
+                        <input type="checkbox" id="chk-${cuenta.account_id}" value="${cuenta.id}" checked>
+                        <input type="text" id="name-${cuenta.account_id}" value="${nombreOriginal}" placeholder="Renombra este cliente">
+                    </div>
+                `;
+            });
+        } else {
+            listDOM.innerHTML = '<p>No se encontraron cuentas publicitarias.</p>';
         }
     } catch (error) {
-        console.error("Error obteniendo cuentas:", error);
+        listDOM.innerHTML = '<p>Error cargando cuentas.</p>';
     }
 }
 
-// 4. Construir las tarjetas en base a lo que devolvió Meta
+// 4. Generar Dashboard a medida
+document.getElementById('btn-generate-dashboard').addEventListener('click', () => {
+    const agencyName = document.getElementById('agencyNameInput').value;
+    if(agencyName.trim() !== '') {
+        document.querySelector('header h1').innerHTML = `${agencyName} <span class="beta-tag">SaaS BETA</span>`;
+    }
+
+    CLIENTES = [];
+    cuentasBaseMeta.forEach(cuenta => {
+        const checkbox = document.getElementById(`chk-${cuenta.account_id}`);
+        if(checkbox && checkbox.checked) {
+            const customName = document.getElementById(`name-${cuenta.account_id}`).value;
+            CLIENTES.push({
+                idDOM: `client-${cuenta.account_id}`,
+                accountId: cuenta.id,
+                name: customName || cuenta.name,
+                status: cuenta.account_status,
+                targetCPA: DEFAULT_TARGET_CPA
+            });
+        }
+    });
+
+    if(CLIENTES.length === 0) return alert("Debes seleccionar al menos una cuenta.");
+
+    document.getElementById('setupContainer').classList.add('hidden');
+    document.getElementById('dashboardGrid').classList.remove('hidden');
+
+    construirTarjetasHTML();
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    cargarDatos(start, end);
+});
+
+// 5. Construir HTML de las tarjetas elegidas
 function construirTarjetasHTML() {
     const grid = document.getElementById('dashboardGrid');
     grid.innerHTML = ''; 
 
     CLIENTES.forEach(cliente => {
-        // Asignar etiqueta de estado inicial
         let badgeClass = 'status-warning';
         let badgeText = 'REVISIÓN/OTRO';
         
@@ -119,7 +155,7 @@ function construirTarjetasHTML() {
     });
 }
 
-// 5. Cargar las métricas de gasto y CPA
+// 6. Cargar Métricas a las tarjetas activas
 async function cargarDatos(fechaInicio, fechaFin) {
     const timeRange = JSON.stringify({ since: fechaInicio, until: fechaFin });
     alertasGlobales = [];
@@ -166,7 +202,7 @@ async function cargarDatos(fechaInicio, fechaFin) {
         }
     }
     
-    // Dibujar alertas
+    // Dibujar alertas si hay
     if (alertasGlobales.length > 0) {
         const panel = document.getElementById('alertPanel');
         const list = document.getElementById('alertList');

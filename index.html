@@ -1,28 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Dashboard | IGNITE</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Agencia SaaS <span class="beta-tag">BETA</span></h1>
-            <div class="date-filter">
-                <div class="date-group">
-                    <label for="startDate">Desde:</label>
-                    <input type="date" id="startDate">
-                </div>
-                <div class="date-group">
-                    <label for="endDate">Hasta:</label>
-                    <input type="date" id="endDate">
-                </div>
-            </div>
-        </header>
-
-        <div id="loginContainer" class="login-container">
+<div id="loginContainer" class="login-container">
             <h2>Conecta tu agencia</h2>
             <p>Inicia sesión para cargar automáticamente las cuentas de tus clientes.</p>
             <button id="btn-login" class="btn-fb">
@@ -31,13 +7,28 @@
             </button>
         </div>
 
+        <div id="setupContainer" class="setup-container hidden">
+            <h2>⚙️ Configura tu Dashboard</h2>
+            
+            <div class="setup-group">
+                <label>Nombre de tu Agencia:</label>
+                <input type="text" id="agencyNameInput" placeholder="Ej: IGNITE Agency">
+            </div>
+
+            <div class="setup-group">
+                <label>Selecciona y renombra tus clientes:</label>
+                <p class="subtitle">Marca las cuentas que quieres ver y ponles el nombre comercial.</p>
+                <div id="accountsList" class="accounts-list">
+                    <p>Cargando cuentas de Meta...</p>
+                </div>
+            </div>
+
+            <button id="btn-generate-dashboard" class="btn-primary">Generar Dashboard</button>
+        </div>
+
         <div id="alertPanel" class="alert-panel hidden">
             <h3>⚠️ Alertas Tempranas</h3>
             <ul id="alertList"></ul>
         </div>
 
-        <main class="dashboard-grid" id="dashboardGrid" style="display: none;"></main>
-    </div>
-    <script src="app.js"></script>
-</body>
-</html>
+        <main class="dashboard-grid hidden" id="dashboardGrid"></main>
